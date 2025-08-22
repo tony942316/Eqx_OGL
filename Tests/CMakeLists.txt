@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.28)
+
+add_subdirectory(Window/)
+add_subdirectory(Quad/)
+add_subdirectory(MVP/)
+add_subdirectory(Texture/)
+add_subdirectory(Spin/)
+add_subdirectory(Keyboard/)
+add_subdirectory(Multi/)
+add_subdirectory(View/)
