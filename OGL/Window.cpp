@@ -134,14 +134,14 @@ export namespace eqx::ogl
             m_window = nullptr;
         }
 
-        inline eqx::lib::Point<float> get_cursor_location() const noexcept
+        inline eqx::lib::PointF get_cursor_location() const noexcept
         {
             assert(m_window != nullptr);
 
             auto x = 0.0;
             auto y = 0.0;
             glfwGetCursorPos(m_window, &x, &y);
-            return eqx::lib::Point<float>{ static_cast<float>(x),
+            return eqx::lib::PointF{ static_cast<float>(x),
                 static_cast<float>(-y) };
         }
 

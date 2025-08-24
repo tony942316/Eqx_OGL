@@ -22,7 +22,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     eqx::ogl::init();
 
-    auto loc = eqx::lib::Point<float>{};
+    auto loc = eqx::lib::PointF{};
     auto start = std::chrono::steady_clock::now();
     auto end = start;
     auto frames = 0ull;
@@ -55,9 +55,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     shader_program.activate_texture("u_tex0"sv, 0);
 
-    auto box_loc = eqx::lib::Point<float>{ 0.0f, 0.0f };
-    auto box_vel = eqx::lib::Point<float>{ 0.0f, 0.0f };
-    auto box_acc = eqx::lib::Point<float>{ 0.0f, 0.0f };
+    auto box_loc = eqx::lib::PointF{ 0.0f, 0.0f };
+    auto box_vel = eqx::lib::PointF{ 0.0f, 0.0f };
+    auto box_acc = eqx::lib::PointF{ 0.0f, 0.0f };
 
     while (!window.should_close())
     {
