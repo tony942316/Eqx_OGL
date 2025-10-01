@@ -22,7 +22,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     eqx::ogl::init();
 
-    auto loc = eqx::lib::PointF{};
+    auto loc = eqx::lib::Point<float>{};
     auto start = std::chrono::steady_clock::now();
     auto end = start;
     auto frames = 0ull;
@@ -58,15 +58,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     shader_program.activate_texture("u_tex0"sv, 0);
 
-    auto box_loc = eqx::lib::PointF{ 100.0f, -100.0f };
-    auto box_vel = eqx::lib::PointF{ 0.0f, 0.0f };
-    auto box_acc = eqx::lib::PointF{ 0.0f, 0.0f };
+    auto box_loc = eqx::lib::Point<float>{ 100.0f, -100.0f };
+    auto box_vel = eqx::lib::Point<float>{ 0.0f, 0.0f };
+    auto box_acc = eqx::lib::Point<float>{ 0.0f, 0.0f };
 
-    auto box_loc2 = eqx::lib::PointF{ 600.0f, -600.0f };
-    auto box_vel2 = eqx::lib::PointF{ 0.0f, 0.0f };
-    auto box_acc2 = eqx::lib::PointF{ 0.0f, 0.0f };
+    auto box_loc2 = eqx::lib::Point<float>{ 600.0f, -600.0f };
+    auto box_vel2 = eqx::lib::Point<float>{ 0.0f, 0.0f };
+    auto box_acc2 = eqx::lib::Point<float>{ 0.0f, 0.0f };
 
-    auto view_scale = eqx::lib::PointF{ 1.0f, 1.0f };
+    auto view_scale = eqx::lib::Point<float>{ 1.0f, 1.0f };
 
     while (!window.should_close())
     {
@@ -121,19 +121,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
         if (window.key_down(eqx::ogl::Window::Key::Up))
         {
-            view_scale.trans(eqx::lib::PointF{ 0.1f, 0.1f });
+            view_scale.translate(eqx::lib::Point<float>{ 0.1f, 0.1f });
         }
 
         if (window.key_down(eqx::ogl::Window::Key::Down))
         {
-            view_scale.trans(eqx::lib::PointF{ -0.1f, -0.1f });
+            view_scale.translate(eqx::lib::Point<float>{ -0.1f, -0.1f });
         }
 
-        box_vel.trans(box_acc);
+        box_vel.translate(box_acc);
         box_vel.set_xy(std::ranges::clamp(box_vel.get_x(), -5.0f, 5.0f),
             std::ranges::clamp(box_vel.get_y(), -5.0f, 5.0f));
 
-        box_loc.trans(box_vel);
+        box_loc.translate(box_vel);
 
         model = glm::translate(glm::mat4{ 1.0f },
             glm::vec3{ box_loc.get_x(), box_loc.get_y(), 0.0f });

@@ -22,13 +22,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     eqx::ogl::init();
 
-    auto loc = eqx::lib::PointF{};
+    auto loc = eqx::lib::Point<float>{};
     auto start = std::chrono::steady_clock::now();
     auto end = start;
     auto frames = 0ull;
     auto fps = 0.0f;
 
-    auto window = eqx::ogl::Window{ 1920, 1080, "eqx::OGL --- Test Keyboard"sv };
+    auto window =
+        eqx::ogl::Window{ 1920, 1080, "eqx::OGL --- Test Keyboard"sv };
     auto shader_program = eqx::ogl::Shader_Program::from_files(
         "./Resources/Shaders/Keyboard/Vertex.glsl"sv,
         "./Resources/Shaders/Keyboard/Fragment.glsl"sv);
@@ -55,9 +56,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     shader_program.activate_texture("u_tex0"sv, 0);
 
-    auto box_loc = eqx::lib::PointF{ 0.0f, 0.0f };
-    auto box_vel = eqx::lib::PointF{ 0.0f, 0.0f };
-    auto box_acc = eqx::lib::PointF{ 0.0f, 0.0f };
+    auto box_loc = eqx::lib::Point<float>{ 0.0f, 0.0f };
+    auto box_vel = eqx::lib::Point<float>{ 0.0f, 0.0f };
+    auto box_acc = eqx::lib::Point<float>{ 0.0f, 0.0f };
 
     while (!window.should_close())
     {
@@ -110,11 +111,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
             box_acc.set_x(0.1f);
         }
 
-        box_vel.trans(box_acc);
+        box_vel.translate(box_acc);
         box_vel.set_xy(std::ranges::clamp(box_vel.get_x(), -5.0f, 5.0f),
             std::ranges::clamp(box_vel.get_y(), -5.0f, 5.0f));
 
-        box_loc.trans(box_vel);
+        box_loc.translate(box_vel);
 
         model = glm::translate(glm::mat4{ 1.0f },
             glm::vec3{ box_loc.get_x(), box_loc.get_y(), 0.0f });

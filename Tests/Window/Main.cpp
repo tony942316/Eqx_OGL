@@ -18,7 +18,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 
     eqx::ogl::init();
 
-    auto loc = eqx::lib::PointF{};
+    auto loc = eqx::lib::Point<float>{};
     auto start = std::chrono::steady_clock::now();
     auto end = start;
     auto frames = 0ull;
