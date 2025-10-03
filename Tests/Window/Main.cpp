@@ -19,13 +19,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
     eqx::ogl::init();
 
     auto loc = eqx::lib::Point<float>{};
-    auto start = std::chrono::steady_clock::now();
-    auto end = start;
-    auto frames = 0ull;
-    auto fps = 0.0f;
 
     auto window = eqx::ogl::Window{ 1920, 1080, "eqx::ogl --- Test Window"sv };
 
+    auto frame_timer = eqx::ogl::Frame_Timer{};
     while (!window.should_close())
     {
         window.clear();
@@ -37,25 +34,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
             "Location: ({}, {}) --- "sv
             "Frames: {} --- "sv
             "FPS: {}"sv,
-            loc.get_x(), loc.get_y(), frames, fps));
+            loc.get_x(), loc.get_y(), frame_timer.get_frames(),
+            frame_timer.get_fps()));
 
         if constexpr (c_smoke == true)
         {
             window.close();
         }
 
-        ++frames;
-        end = std::chrono::steady_clock::now();
-        if ((end - start) > 1'000ms) [[unlikely]]
-        {
-            fps = (frames * 1'000.0f)
-                / std::chrono::duration_cast<std::chrono::milliseconds>(
-                    end - start).count();
-            frames = 0ull;
-
-            start = end;
-        }
-
+        frame_timer.update();
         window.swap();
         window.poll();
     }

@@ -213,4 +213,49 @@ export namespace eqx::ogl
     private:
         GLFWwindow* m_window;
     };
+
+    class Frame_Timer
+    {
+    public:
+        Frame_Timer(const Frame_Timer&) = default;
+        Frame_Timer(Frame_Timer&&) = default;
+        Frame_Timer& operator= (const Frame_Timer&) = default;
+        Frame_Timer& operator= (Frame_Timer&&) = default;
+        ~Frame_Timer() = default;
+
+        explicit inline Frame_Timer() noexcept
+            :
+            m_timer(),
+            m_fps(0.0F),
+            m_frames(0ULL)
+        {
+            m_timer.start();
+        }
+
+        inline void update() noexcept
+        {
+            ++this->m_frames;
+            if (this->m_timer.readf() >= 1.0F) [[unlikely]]
+            {
+                this->m_fps = this->m_frames / m_timer.secondsf();
+                this->m_frames = 0ULL;
+                this->m_timer.start();
+            }
+        }
+
+        [[nodiscard]] constexpr float get_fps() const noexcept
+        {
+            return this->m_fps;
+        }
+
+        [[nodiscard]] constexpr float get_frames() const noexcept
+        {
+            return this->m_frames;
+        }
+
+    private:
+        eqx::lib::Timer m_timer;
+        float m_fps;
+        unsigned long long m_frames;
+    };
 }
