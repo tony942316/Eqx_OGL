@@ -116,6 +116,10 @@ export namespace eqx::ogl
                 reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
             assert(ec != 0);
 
+            glEnable(GL_BLEND);
+            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA,
+                GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
             glViewport(0, 0, width, height);
             glfwSetFramebufferSizeCallback(m_window,
                 []([[maybe_unused]] GLFWwindow* window, int width, int height)
@@ -248,7 +252,7 @@ export namespace eqx::ogl
             return this->m_fps;
         }
 
-        [[nodiscard]] constexpr float get_frames() const noexcept
+        [[nodiscard]] constexpr unsigned long long get_frames() const noexcept
         {
             return this->m_frames;
         }
