@@ -66,8 +66,12 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/Resources/Textures/M4_Sherman_Turret.png
     COPYONLY)
 configure_file(
-    ${CMAKE_SOURCE_DIR}/Resources/Textures/Panzer.png
-    ${CMAKE_CURRENT_BINARY_DIR}/Resources/Textures/Panzer.png
+    ${CMAKE_SOURCE_DIR}/Resources/Textures/Panzer3_Hull.png
+    ${CMAKE_CURRENT_BINARY_DIR}/Resources/Textures/Panzer3_Hull.png
+    COPYONLY)
+configure_file(
+    ${CMAKE_SOURCE_DIR}/Resources/Textures/Panzer3_Turret.png
+    ${CMAKE_CURRENT_BINARY_DIR}/Resources/Textures/Panzer3_Turret.png
     COPYONLY)
 configure_file(
     ${CMAKE_SOURCE_DIR}/Resources/Textures/Panzer3_Destroyed.png
@@ -76,10 +80,6 @@ configure_file(
 configure_file(
     ${CMAKE_SOURCE_DIR}/Resources/Textures/TankShell.png
     ${CMAKE_CURRENT_BINARY_DIR}/Resources/Textures/TankShell.png
-    COPYONLY)
-configure_file(
-    ${CMAKE_SOURCE_DIR}/Resources/Textures/TankTurret.png
-    ${CMAKE_CURRENT_BINARY_DIR}/Resources/Textures/TankTurret.png
     COPYONLY)
 
 eqx_copy_asan(Test_KGame_Smoke_Typical)

@@ -13,6 +13,292 @@ using namespace std::literals;
     constexpr auto c_smoke = false;
 #endif // EQX_SMOKE
 
+namespace Component
+{
+    class Angular
+    {
+    public:
+        enum class State : int
+        {
+            Right = -1,
+            Stop = 0,
+            Left = 1
+        };
+
+        Angular(const Angular&) = default;
+        Angular(Angular&&) = default;
+        Angular& operator= (const Angular&) = default;
+        Angular& operator= (Angular&&) = default;
+        ~Angular() = default;
+
+        explicit constexpr Angular(const float velocity,
+            const float max_velocity, const float acceleration,
+            const eqx::lib::Point<float>& pivot, const float friction) noexcept
+            :
+            m_state(State::Stop),
+            m_velocity(velocity),
+            m_max_velocity(max_velocity),
+            m_acceleration(acceleration),
+            m_pivot(pivot),
+            m_friction(friction)
+        {
+        }
+
+        constexpr std::pair<float, eqx::lib::Point<float>>
+            update(eqx::lib::Polygon<float, 4>& geometry,
+            const float dt) noexcept
+        {
+            this->m_velocity += std::ranges::clamp(
+                this->m_acceleration * static_cast<int>(this->m_state) * dt,
+                -this->m_max_velocity, this->m_max_velocity);
+
+            auto fric = std::ranges::min(this->m_friction * dt,
+                eqx::lib::Math::abs(this->m_velocity));
+            fric = this->m_velocity >= 0.0F ? -fric : fric;
+            this->m_velocity += fric;
+
+            geometry.rotate(
+                eqx::lib::Math::to_radians(this->m_velocity * dt),
+                this->m_pivot);
+
+            return std::make_pair(
+                eqx::lib::Math::to_radians(this->m_velocity * dt),
+                this->m_pivot);
+        }
+
+        constexpr void set_state(const State state) noexcept
+        {
+            this->m_state = state;
+        }
+
+        constexpr void set_pivot(const eqx::lib::Point<float>& pivot) noexcept
+        {
+            this->m_pivot = pivot;
+        }
+
+        [[nodiscard]] constexpr float get_velocity() const noexcept
+        {
+            return this->m_velocity;
+        }
+
+    private:
+        State m_state;
+        float m_velocity;
+        float m_max_velocity;
+        float m_acceleration;
+        eqx::lib::Point<float> m_pivot;
+        float m_friction;
+    };
+
+    class Linear
+    {
+    public:
+        enum class State : int
+        {
+            Reverse = -1,
+            Stop = 0,
+            Forward = 1
+        };
+
+        Linear(const Linear&) = default;
+        Linear(Linear&&) = default;
+        Linear& operator= (const Linear&) = default;
+        Linear& operator= (Linear&&) = default;
+        ~Linear() = default;
+
+        explicit constexpr Linear(const eqx::lib::Point<float>& velocity,
+            const float max_speed,
+            const eqx::lib::Point<float>& acceleration,
+            const float friction) noexcept
+            :
+            m_state(State::Stop),
+            m_velocity(velocity),
+            m_max_speed(max_speed),
+            m_acceleration(acceleration),
+            m_friction(friction)
+        {
+        }
+
+        constexpr eqx::lib::Point<float> update(
+            eqx::lib::Polygon<float, 4>& geometry, const float dt) noexcept
+        {
+            this->m_velocity.translate(eqx::lib::Point<float>::scale(
+                this->m_acceleration, static_cast<int>(this->m_state) * dt));
+
+            this->m_velocity.projection(this->m_acceleration);
+
+            if (this->m_velocity.magnitude() > this->m_max_speed)
+            {
+                this->m_velocity.scale(
+                    1.0F / (this->m_velocity.magnitude() / this->m_max_speed));
+            }
+
+            if (this->m_velocity.magnitude2() > 0.0F)
+            {
+                auto friction = eqx::lib::Point<float>::scale(
+                    eqx::lib::Point<float>::normalize(
+                        eqx::lib::Point<float>::negate(this->m_velocity)),
+                    this->m_friction * dt);
+
+                this->m_velocity.translate(friction);
+            }
+
+            geometry.translate(eqx::lib::Point<float>::scale(
+                this->m_velocity, dt));
+
+            return eqx::lib::Point<float>::scale(this->m_velocity, dt);
+        }
+
+        constexpr void set_state(const State state) noexcept
+        {
+            this->m_state = state;
+        }
+
+        constexpr void set_acceleration(
+            const eqx::lib::Point<float>& acceleration) noexcept
+        {
+            this->m_acceleration = acceleration;
+        }
+
+        [[nodiscard]] constexpr const eqx::lib::Point<float>&
+            get_velocity() const noexcept
+        {
+            return this->m_velocity;
+        }
+
+    private:
+        State m_state;
+        eqx::lib::Point<float> m_velocity;
+        float m_max_speed;
+        eqx::lib::Point<float> m_acceleration;
+        float m_friction;
+    };
+}
+
+class Tank
+{
+public:
+    Tank(const Tank&) = default;
+    Tank(Tank&&) = default;
+    Tank& operator= (const Tank&) = default;
+    Tank& operator= (Tank&&) = default;
+    ~Tank() = default;
+
+    explicit constexpr Tank(const float hw, const float hh,
+        const float tw, const float th,
+        const eqx::lib::Point<float>& hl,
+        const eqx::lib::Point<float>& tl, const float ang) noexcept
+        :
+        m_hull_geometry(),
+        m_turret_geometry(),
+        m_hull_angular(0.0F, 30.0F, 35.0F,
+            eqx::lib::Point<float>{ 1730.0F, -540.0F }, 30.0F),
+        m_turret_angular(0.0F, 50.0F, 55.0F,
+            eqx::lib::Point<float>{ 1730.0F, -540.0F }, 50.0F),
+        m_hull_linear(eqx::lib::Point<float>::origin(), 100.0F,
+            eqx::lib::Point<float>::origin(), 40.0F)
+    {
+        this->m_hull_geometry = eqx::lib::Polygon<float, 4>{
+            eqx::lib::Point<float>{ hw, hh },
+            eqx::lib::Point<float>{ -hw, hh },
+            eqx::lib::Point<float>{ -hw, -hh },
+            eqx::lib::Point<float>{ hw, -hh } };
+        //this->m_hull_geometry = eqx::lib::Polygon<float, 4>::make_rectangle(
+            //115.0203F, 200.0F);
+        this->m_hull_geometry.move(hl);
+        this->m_hull_geometry.rotate(ang);
+
+        this->m_turret_geometry = eqx::lib::Polygon<float, 4>{
+            eqx::lib::Point<float>{ tw, th },
+            eqx::lib::Point<float>{ -tw, th },
+            eqx::lib::Point<float>{ -tw, -th },
+            eqx::lib::Point<float>{ tw, -th } };
+        this->m_turret_geometry.move(tl);
+        this->m_turret_geometry.rotate(ang);
+    }
+
+    constexpr void update(const float dt) noexcept
+    {
+        const auto p1 = eqx::lib::Point<float>::normalize(
+            eqx::lib::Point<float>::translate(
+                this->m_hull_geometry.get_data()[0],
+                eqx::lib::Point<float>::negate(
+                    this->m_hull_geometry.get_data()[3])));
+
+        this->m_hull_linear.set_acceleration(
+            eqx::lib::Point<float>::scale(p1, 50.0F));
+
+        const auto trans =
+            this->m_hull_linear.update(this->m_hull_geometry, dt);
+        this->m_turret_geometry.translate(trans);
+
+        if (this->m_hull_angular.get_velocity() < 0.0F)
+        {
+            this->m_hull_angular.set_pivot(eqx::lib::Point<float>::midpoint(
+                this->m_hull_geometry.get_data()[0],
+                this->m_hull_geometry.get_data()[3]));
+        }
+        else
+        {
+            this->m_hull_angular.set_pivot(eqx::lib::Point<float>::midpoint(
+                this->m_hull_geometry.get_data()[1],
+                this->m_hull_geometry.get_data()[2]));
+        }
+
+        const auto [rad, pivot] =
+            this->m_hull_angular.update(this->m_hull_geometry, dt);
+        this->m_turret_geometry.rotate(rad, pivot);
+
+        const auto front = eqx::lib::Point<float>::midpoint(
+            this->m_hull_geometry.get_data()[0],
+            this->m_hull_geometry.get_data()[1]);
+        const auto back = eqx::lib::Point<float>::midpoint(
+            this->m_hull_geometry.get_data()[2],
+            this->m_hull_geometry.get_data()[3]);
+
+        this->m_turret_angular.set_pivot(eqx::lib::Point<float>::lerp(
+            front, back, 0.55F));
+        this->m_turret_angular.update(this->m_turret_geometry, dt);
+    }
+
+    constexpr void set_hull_state(
+        const Component::Angular::State state) noexcept
+    {
+        this->m_hull_angular.set_state(state);
+    }
+
+    constexpr void set_turret_state(
+        const Component::Angular::State state) noexcept
+    {
+        this->m_turret_angular.set_state(state);
+    }
+
+    constexpr void set_hull_linear_state(
+        const Component::Linear::State state) noexcept
+    {
+        this->m_hull_linear.set_state(state);
+    }
+
+    [[nodiscard]] constexpr const eqx::lib::Polygon<float, 4>&
+        get_hull_geometry() const noexcept
+    {
+        return this->m_hull_geometry;
+    }
+
+    [[nodiscard]] constexpr const eqx::lib::Polygon<float, 4>&
+        get_turret_geometry() const noexcept
+    {
+        return this->m_turret_geometry;
+    }
+
+private:
+    eqx::lib::Polygon<float, 4> m_hull_geometry;
+    eqx::lib::Polygon<float, 4> m_turret_geometry;
+    Component::Angular m_hull_angular;
+    Component::Angular m_turret_angular;
+    Component::Linear m_hull_linear;
+};
+
 class Sim
 {
 public:
@@ -22,54 +308,28 @@ public:
     Sim& operator= (Sim&&) = default;
     ~Sim() = default;
 
-    enum class Turning_State : int
-    {
-        Left = 1,
-        Right = -1,
-        Stop = 0
-    };
-
     explicit constexpr Sim() noexcept
         :
-        m_player(),
-        m_angv(0.0F),
-        m_mangv(80.0F),
+        m_sherman(114.0F, 200.0F, 74.065F, 110.0F,
+            eqx::lib::Point<float>{ 1700.0F, -540.0F },
+            eqx::lib::Point<float>{ 1715.0F, -540.0F },
+            std::numbers::pi_v<float> / 2.0F),
+        m_panzer(200.0F * 0.57F, 200.0F, 120.0F * 0.5227F, 120.0F,
+            eqx::lib::Point<float>{ 300.0F, -540.0F },
+            eqx::lib::Point<float>{ 345.0F, -540.0F },
+            -std::numbers::pi_v<float> / 2.0F),
         m_alive(true)
     {
-        this->m_player = eqx::lib::Polygon<float, 4>{
-            eqx::lib::Point<float>{ 200.0F, 200.0F },
-            eqx::lib::Point<float>{ -200.0F, 200.0F },
-            eqx::lib::Point<float>{ -200.0F, -200.0F },
-            eqx::lib::Point<float>{ 200.0F, -200.0F } };
-        this->m_player.move(eqx::lib::Point<float>{ 1700.0F, -540.0F });
-        this->m_player.rotate(std::numbers::pi_v<float> / 2.0F);
-
-        this->m_panzer = eqx::lib::Polygon<float, 4>{
-            eqx::lib::Point<float>{ 200.0F, 200.0F },
-            eqx::lib::Point<float>{ -200.0F, 200.0F },
-            eqx::lib::Point<float>{ -200.0F, -200.0F },
-            eqx::lib::Point<float>{ 200.0F, -200.0F } };
-        this->m_panzer.move(eqx::lib::Point<float>{ 400.0F, -540.0F });
-        this->m_panzer.rotate(-std::numbers::pi_v<float> / 2.0F);
     }
 
     constexpr void update(const float dt) noexcept
     {
-        auto pivot = eqx::lib::Point<float>{
-            1700.0F + 80.0F, -540.0F };
-
-        m_angv += 50.0F * static_cast<int>(this->m_turning_state) * dt;
-        m_angv = std::ranges::clamp(m_angv, -m_mangv, m_mangv);
-
-        auto fric = std::ranges::min(25.0F * dt, eqx::lib::Math::abs(m_angv));
-        fric = m_angv >= 0.0F ? -fric : fric;
-        m_angv += fric;
-
-        m_player.rotate(eqx::lib::Math::to_radians(m_angv * dt), pivot);
+        this->m_sherman.update(dt);
+        this->m_panzer.update(dt);
 
         if (this->m_shell.has_value())
         {
-            if (this->m_shell->aabb(this->m_panzer))
+            if (this->m_shell->aabb(this->m_panzer.get_hull_geometry()))
             {
                 this->m_alive = false;
                 this->m_shell.reset();
@@ -89,36 +349,52 @@ public:
         }
     }
 
-    constexpr void set_turning_state(const Turning_State state) noexcept
+    constexpr void set_sherman_turret_state(
+        const Component::Angular::State state) noexcept
     {
-        this->m_turning_state = state;
+        this->m_sherman.set_turret_state(state);
+    }
+
+    constexpr void set_sherman_hull_state(
+        const Component::Angular::State state) noexcept
+    {
+        this->m_sherman.set_hull_state(state);
+    }
+
+    constexpr void set_sherman_hull_linear_state(
+        const Component::Linear::State state) noexcept
+    {
+        this->m_sherman.set_hull_linear_state(state);
     }
 
     constexpr void fire() noexcept
     {
         if (!this->m_shell.has_value())
         {
-            auto dir = eqx::lib::Point<float>::translate(
-                eqx::lib::Point<float>::midpoint(
-                    this->m_player.get_data()[0], this->m_player.get_data()[1]),
-                eqx::lib::Point<float>::negate(this->m_player.center()));
-            dir.normalize();
+            const auto front = eqx::lib::Point<float>::midpoint(
+                this->m_sherman.get_turret_geometry().get_data()[0],
+                this->m_sherman.get_turret_geometry().get_data()[1]);
+            const auto back = eqx::lib::Point<float>::midpoint(
+                this->m_sherman.get_turret_geometry().get_data()[2],
+                this->m_sherman.get_turret_geometry().get_data()[3]);
+            const auto dir = eqx::lib::Point<float>::normalize(
+                eqx::lib::Point<float>::translate(
+                    front, eqx::lib::Point<float>::negate(back)));
 
-            auto dest = eqx::lib::Point<float>::midpoint(
-                this->m_player.get_data()[0], this->m_player.get_data()[1]);
-            dest.translate(eqx::lib::Point<float>::negate(
+            const auto dest = eqx::lib::Point<float>::translate(front,
+                    eqx::lib::Point<float>::negate(
                         eqx::lib::Point<float>::scale(dir, 100.0F)));
 
             m_shell.emplace();
             this->m_shell.emplace(eqx::lib::Polygon<float, 4>{
-                eqx::lib::Point<float>{ 50.0F, 50.0F },
-                eqx::lib::Point<float>{ -50.0F, 50.0F },
-                eqx::lib::Point<float>{ -50.0F, -50.0F },
-                eqx::lib::Point<float>{ 50.0F, -50.0F } });
+                eqx::lib::Point<float>{ 6.6F, 20.0F },
+                eqx::lib::Point<float>{ -6.6F, 20.0F },
+                eqx::lib::Point<float>{ -6.6F, -20.0F },
+                eqx::lib::Point<float>{ 6.6F, -20.0F } });
             this->m_shell->move(dest);
             this->m_shell->rotate(std::atan2f(dir.get_y(), dir.get_x())
                 - (std::numbers::pi_v<float> / 2.0F));
-            this->m_shellv = eqx::lib::Point<float>::scale(dir, 5'000.0F);
+            this->m_shellv = eqx::lib::Point<float>::scale(dir, 2'000.0F);
         }
     }
 
@@ -127,22 +403,28 @@ public:
         this->m_alive = true;
     }
 
-    [[nodiscard]] constexpr eqx::lib::Point<float>
-        get_player_location() const noexcept
+    [[nodiscard]] constexpr const eqx::lib::Polygon<float, 4>&
+        get_sherman_turret() const noexcept
     {
-        return this->m_player.center();
+        return this->m_sherman.get_turret_geometry();
     }
 
     [[nodiscard]] constexpr const eqx::lib::Polygon<float, 4>&
-        get_player() const noexcept
+        get_sherman_hull() const noexcept
     {
-        return this->m_player;
+        return this->m_sherman.get_hull_geometry();
     }
 
     [[nodiscard]] constexpr const eqx::lib::Polygon<float, 4>&
-        get_panzer() const noexcept
+        get_panzer_turret() const noexcept
     {
-        return this->m_panzer;
+        return this->m_panzer.get_turret_geometry();
+    }
+
+    [[nodiscard]] constexpr const eqx::lib::Polygon<float, 4>&
+        get_panzer_hull() const noexcept
+    {
+        return this->m_panzer.get_hull_geometry();
     }
 
     [[nodiscard]] constexpr const std::optional<eqx::lib::Polygon<float, 4>>
@@ -157,14 +439,106 @@ public:
     }
 
 private:
-    eqx::lib::Polygon<float, 4> m_player;
-    eqx::lib::Polygon<float, 4> m_panzer;
+    Tank m_sherman;
+    Tank m_panzer;
     std::optional<eqx::lib::Polygon<float, 4>> m_shell;
-    Turning_State m_turning_state;
-    float m_angv;
-    float m_mangv;
     bool m_alive;
     eqx::lib::Point<float> m_shellv;
+};
+
+class Renderer
+{
+public:
+    Renderer(const Renderer&) = default;
+    Renderer(Renderer&&) = default;
+    Renderer& operator= (const Renderer&) = default;
+    Renderer& operator= (Renderer&&) = default;
+    ~Renderer() = default;
+
+    explicit inline Renderer() noexcept
+        :
+        m_shader_program(eqx::ogl::Shader_Program::from_files(
+            "./Resources/Shaders/KGame/Vertex.glsl"sv,
+            "./Resources/Shaders/KGame/Fragment.glsl"sv)),
+        m_vertex_array(
+            std::array<float, 16>{},
+            std::array<unsigned int, 2>{ 2u, 2u },
+            std::array<unsigned int, 6>{ 0u, 1u, 2u, 1u, 3u, 2u }),
+        m_sherman_turret_tex("./Resources/Textures/M4_Sherman_Turret.png"sv),
+        m_sherman_hull_tex("./Resources/Textures/M4_Sherman_Hull.png"sv),
+        m_panzer_turret_tex("./Resources/Textures/Panzer3_Turret.png"sv),
+        m_panzer_hull_tex("./Resources/Textures/Panzer3_Hull.png"sv),
+        m_panzer_destroyed_tex("./Resources/Textures/Panzer3_Destroyed.png"sv),
+        m_shell_tex("./Resources/Textures/TankShell.png"sv)
+    {
+        auto model = glm::mat4{ 1.0F };
+        auto view = glm::mat4{ 1.0f };
+        auto proj = glm::ortho(0.0f, 1920.0f, -1080.0f, 0.0f);
+        this->m_shader_program.set_mat4("u_model"sv, model);
+        this->m_shader_program.set_mat4("u_view"sv, view);
+        this->m_shader_program.set_mat4("u_proj"sv, proj);
+
+        this->m_shader_program.activate_texture("u_tex0"sv, 0);
+    }
+
+    inline void render(const Sim& sim) noexcept
+    {
+        this->set_vertex_array(sim.get_sherman_hull());
+        this->draw(this->m_sherman_hull_tex);
+
+        if (sim.get_shell().has_value())
+        {
+            this->set_vertex_array(sim.get_shell().value());
+            this->draw(this->m_shell_tex);
+        }
+
+        this->set_vertex_array(sim.get_sherman_turret());
+        this->draw(this->m_sherman_turret_tex);
+
+        if (sim.panzer_alive())
+        {
+            this->set_vertex_array(sim.get_panzer_hull());
+            this->draw(this->m_panzer_hull_tex);
+
+            this->set_vertex_array(sim.get_panzer_turret());
+            this->draw(this->m_panzer_turret_tex);
+        }
+        else
+        {
+            this->set_vertex_array(sim.get_panzer_hull());
+            this->draw(this->m_panzer_destroyed_tex);
+        }
+    }
+
+private:
+    inline void draw(const eqx::ogl::Texture& tex) const noexcept
+    {
+        this->m_shader_program.enable();
+        this->m_vertex_array.enable();
+        tex.enable(0);
+        eqx::ogl::draw(this->m_vertex_array.get_index_count());
+    }
+
+    inline void set_vertex_array(
+        const eqx::lib::Polygon<float, 4>& geometry) noexcept
+    {
+        this->m_vertex_array.set_vertex_buffer(
+            std::array<float, 16>{
+                geometry.get_data()[0].get_x(), geometry.get_data()[0].get_y(), 1.0F, 0.0F,
+                geometry.get_data()[1].get_x(), geometry.get_data()[1].get_y(), 0.0F, 0.0F,
+                geometry.get_data()[3].get_x(), geometry.get_data()[3].get_y(), 1.0F, 1.0F,
+                geometry.get_data()[2].get_x(), geometry.get_data()[2].get_y(), 0.0F, 1.0F },
+            std::array<unsigned int, 2>{ 2U, 2U });
+    }
+
+    eqx::ogl::Shader_Program m_shader_program;
+    eqx::ogl::Vertex_Array m_vertex_array;
+    eqx::ogl::Texture m_sherman_turret_tex;
+    eqx::ogl::Texture m_sherman_hull_tex;
+    eqx::ogl::Texture m_panzer_turret_tex;
+    eqx::ogl::Texture m_panzer_hull_tex;
+    eqx::ogl::Texture m_panzer_destroyed_tex;
+    eqx::ogl::Texture m_shell_tex;
 };
 
 class KGame
@@ -178,28 +552,10 @@ public:
 
     explicit inline KGame() noexcept
         :
-        m_sim(),
         m_window(1920, 1080, "eqx::OGL --- Test Kgame"sv),
-        m_shader_program(eqx::ogl::Shader_Program::from_files(
-            "./Resources/Shaders/KGame/Vertex.glsl"sv,
-            "./Resources/Shaders/KGame/Fragment.glsl"sv)),
-        m_vertex_array(
-            std::array<float, 16>{},
-            std::array<unsigned int, 2>{ 2u, 2u },
-            std::array<unsigned int, 6>{ 0u, 1u, 2u, 1u, 3u, 2u }),
-        m_turret_tex("./Resources/Textures/TankTurret.png"sv),
-        m_panzer_tex("./Resources/Textures/Panzer.png"sv),
-        m_panzer3_destroyed_tex("./Resources/Textures/Panzer3_Destroyed.png"sv),
-        m_shell_tex("./Resources/Textures/TankShell.png"sv)
+        m_sim(),
+        m_renderer()
     {
-        auto model = glm::mat4{ 1.0F };
-        auto view = glm::mat4{ 1.0f };
-        auto proj = glm::ortho(0.0f, 1920.0f, -1080.0f, 0.0f);
-        this->m_shader_program.set_mat4("u_model"sv, model);
-        this->m_shader_program.set_mat4("u_view"sv, view);
-        this->m_shader_program.set_mat4("u_proj"sv, proj);
-
-        this->m_shader_program.activate_texture("u_tex0"sv, 0);
     }
 
     inline void run() noexcept
@@ -236,7 +592,7 @@ public:
                 seconds -= tick;
             }
 
-            this->render();
+            this->m_renderer.render(this->m_sim);
 
             if (this->m_window.key_down(eqx::ogl::Window::Key::Escape))
             {
@@ -260,20 +616,58 @@ private:
         if (this->m_window.key_down(eqx::ogl::Window::Key::Left)
             && this->m_window.key_down(eqx::ogl::Window::Key::Right))
         {
-            this->m_sim.set_turning_state(Sim::Turning_State::Stop);
+            this->m_sim.set_sherman_turret_state(Component::Angular::State::Stop);
         }
         else if (this->m_window.key_up(eqx::ogl::Window::Key::Left)
             && this->m_window.key_up(eqx::ogl::Window::Key::Right))
         {
-            this->m_sim.set_turning_state(Sim::Turning_State::Stop);
+            this->m_sim.set_sherman_turret_state(Component::Angular::State::Stop);
         }
         else if (this->m_window.key_down(eqx::ogl::Window::Key::Left))
         {
-            this->m_sim.set_turning_state(Sim::Turning_State::Left);
+            this->m_sim.set_sherman_turret_state(Component::Angular::State::Left);
         }
         else if (this->m_window.key_down(eqx::ogl::Window::Key::Right))
         {
-            this->m_sim.set_turning_state(Sim::Turning_State::Right);
+            this->m_sim.set_sherman_turret_state(Component::Angular::State::Right);
+        }
+
+        if (this->m_window.key_down(eqx::ogl::Window::Key::A)
+            && this->m_window.key_down(eqx::ogl::Window::Key::D))
+        {
+            this->m_sim.set_sherman_hull_state(Component::Angular::State::Stop);
+        }
+        else if (this->m_window.key_up(eqx::ogl::Window::Key::A)
+            && this->m_window.key_up(eqx::ogl::Window::Key::D))
+        {
+            this->m_sim.set_sherman_hull_state(Component::Angular::State::Stop);
+        }
+        else if (this->m_window.key_down(eqx::ogl::Window::Key::A))
+        {
+            this->m_sim.set_sherman_hull_state(Component::Angular::State::Left);
+        }
+        else if (this->m_window.key_down(eqx::ogl::Window::Key::D))
+        {
+            this->m_sim.set_sherman_hull_state(Component::Angular::State::Right);
+        }
+
+        if (this->m_window.key_down(eqx::ogl::Window::Key::W)
+            && this->m_window.key_down(eqx::ogl::Window::Key::S))
+        {
+            this->m_sim.set_sherman_hull_linear_state(Component::Linear::State::Stop);
+        }
+        else if (this->m_window.key_up(eqx::ogl::Window::Key::W)
+            && this->m_window.key_up(eqx::ogl::Window::Key::S))
+        {
+            this->m_sim.set_sherman_hull_linear_state(Component::Linear::State::Stop);
+        }
+        else if (this->m_window.key_down(eqx::ogl::Window::Key::W))
+        {
+            this->m_sim.set_sherman_hull_linear_state(Component::Linear::State::Forward);
+        }
+        else if (this->m_window.key_down(eqx::ogl::Window::Key::S))
+        {
+            this->m_sim.set_sherman_hull_linear_state(Component::Linear::State::Reverse);
         }
 
         if (this->m_window.key_down(eqx::ogl::Window::Key::Space))
@@ -287,66 +681,9 @@ private:
         }
     }
 
-    inline void render() noexcept
-    {
-        if (this->m_sim.get_shell().has_value())
-        {
-            this->m_vertex_array.set_vertex_buffer(
-                std::array<float, 16>{
-                    this->m_sim.get_shell()->get_data()[0].get_x(), this->m_sim.get_shell()->get_data()[0].get_y(), 1.0F, 0.0F,
-                    this->m_sim.get_shell()->get_data()[1].get_x(), this->m_sim.get_shell()->get_data()[1].get_y(), 0.0F, 0.0F,
-                    this->m_sim.get_shell()->get_data()[3].get_x(), this->m_sim.get_shell()->get_data()[3].get_y(), 1.0F, 1.0F,
-                    this->m_sim.get_shell()->get_data()[2].get_x(), this->m_sim.get_shell()->get_data()[2].get_y(), 0.0F, 1.0F },
-                std::array<unsigned int, 2>{ 2U, 2U });
-
-            this->m_shader_program.enable();
-            this->m_vertex_array.enable();
-            this->m_shell_tex.enable(0);
-            eqx::ogl::draw(this->m_vertex_array.get_index_count());
-        }
-
-        this->m_vertex_array.set_vertex_buffer(
-            std::array<float, 16>{
-                this->m_sim.get_player().get_data()[0].get_x(), this->m_sim.get_player().get_data()[0].get_y(), 1.0F, 0.0F,
-                this->m_sim.get_player().get_data()[1].get_x(), this->m_sim.get_player().get_data()[1].get_y(), 0.0F, 0.0F,
-                this->m_sim.get_player().get_data()[3].get_x(), this->m_sim.get_player().get_data()[3].get_y(), 1.0F, 1.0F,
-                this->m_sim.get_player().get_data()[2].get_x(), this->m_sim.get_player().get_data()[2].get_y(), 0.0F, 1.0F },
-            std::array<unsigned int, 2>{ 2U, 2U });
-
-        this->m_shader_program.enable();
-        this->m_vertex_array.enable();
-        this->m_turret_tex.enable(0);
-        eqx::ogl::draw(this->m_vertex_array.get_index_count());
-
-        this->m_vertex_array.set_vertex_buffer(
-            std::array<float, 16>{
-                this->m_sim.get_panzer().get_data()[0].get_x(), this->m_sim.get_panzer().get_data()[0].get_y(), 1.0F, 0.0F,
-                this->m_sim.get_panzer().get_data()[1].get_x(), this->m_sim.get_panzer().get_data()[1].get_y(), 0.0F, 0.0F,
-                this->m_sim.get_panzer().get_data()[3].get_x(), this->m_sim.get_panzer().get_data()[3].get_y(), 1.0F, 1.0F,
-                this->m_sim.get_panzer().get_data()[2].get_x(), this->m_sim.get_panzer().get_data()[2].get_y(), 0.0F, 1.0F },
-            std::array<unsigned int, 2>{ 2U, 2U });
-
-        this->m_shader_program.enable();
-        this->m_vertex_array.enable();
-        if (this->m_sim.panzer_alive())
-        {
-            this->m_panzer_tex.enable(0);
-        }
-        else
-        {
-            this->m_panzer3_destroyed_tex.enable(0);
-        }
-        eqx::ogl::draw(this->m_vertex_array.get_index_count());
-    }
-
-    Sim m_sim;
     eqx::ogl::Window m_window;
-    eqx::ogl::Shader_Program m_shader_program;
-    eqx::ogl::Vertex_Array m_vertex_array;
-    eqx::ogl::Texture m_turret_tex;
-    eqx::ogl::Texture m_panzer_tex;
-    eqx::ogl::Texture m_panzer3_destroyed_tex;
-    eqx::ogl::Texture m_shell_tex;
+    Sim m_sim;
+    Renderer m_renderer;
 };
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
