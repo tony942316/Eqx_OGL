@@ -56,8 +56,16 @@ export namespace eqx::ogl
             Down = GLFW_KEY_DOWN,
             Right = GLFW_KEY_RIGHT,
             R = GLFW_KEY_R,
+            B = GLFW_KEY_B,
             Space = GLFW_KEY_SPACE,
+            Shift = GLFW_KEY_LEFT_SHIFT,
             Escape = GLFW_KEY_ESCAPE
+        };
+
+        enum class Mouse_Button
+        {
+            Left = GLFW_MOUSE_BUTTON_LEFT,
+            Right = GLFW_MOUSE_BUTTON_RIGHT
         };
 
         enum class Key_State
@@ -116,6 +124,15 @@ export namespace eqx::ogl
                 reinterpret_cast<GLADloadproc>(glfwGetProcAddress));
             assert(ec != 0);
 
+            glfwSetScrollCallback(this->m_window,
+                [] ([[maybe_unused]] GLFWwindow* window, double xoffset,
+                double yoffset) noexcept -> void
+                {
+                    s_scroll_offset.translate(eqx::lib::Point<float>{
+                        static_cast<float>(xoffset),
+                        static_cast<float>(yoffset) });
+                });
+
             glEnable(GL_BLEND);
             glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA,
                 GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -138,7 +155,8 @@ export namespace eqx::ogl
             m_window = nullptr;
         }
 
-        inline eqx::lib::Point<float> get_cursor_location() const noexcept
+        [[nodiscard]] inline eqx::lib::Point<float>
+            get_cursor_location() const noexcept
         {
             assert(m_window != nullptr);
 
@@ -147,6 +165,40 @@ export namespace eqx::ogl
             glfwGetCursorPos(m_window, &x, &y);
             return eqx::lib::Point<float>{ static_cast<float>(x),
                 static_cast<float>(-y) };
+        }
+
+        [[nodiscard]] inline eqx::lib::Point<float>
+            get_dimensions() const noexcept
+        {
+            assert(this->m_window != nullptr);
+
+            int width, height;
+            glfwGetWindowSize(this->m_window, &width, &height);
+
+            return eqx::lib::Point<float>{ static_cast<float>(width),
+                static_cast<float>(height) };
+        }
+
+        [[nodiscard]] inline Key_State mouse_button_state(
+            Mouse_Button button) const noexcept
+        {
+            assert(m_window != nullptr);
+
+            return static_cast<Key_State>(
+                glfwGetMouseButton(this->m_window,
+                    static_cast<decltype(GLFW_MOUSE_BUTTON_LEFT)>(button)));
+        }
+
+        [[nodiscard]] inline bool mouse_button_down(
+            Mouse_Button button) const noexcept
+        {
+            return this->mouse_button_state(button) == Key_State::Down;
+        }
+
+        [[nodiscard]] inline bool mouse_button_up(
+            Mouse_Button button) const noexcept
+        {
+            return !this->mouse_button_down(button);
         }
 
         [[nodiscard]] inline Key_State key_state(Key key) const noexcept
@@ -214,8 +266,22 @@ export namespace eqx::ogl
             glfwSetWindowShouldClose(m_window, GLFW_TRUE);
         }
 
+        [[nodiscard]] static inline const eqx::lib::Point<float>&
+            get_scroll_offset() noexcept
+        {
+            return s_scroll_offset;
+        }
+
+        static inline void reset_scroll_offset() noexcept
+        {
+            s_scroll_offset = eqx::lib::Point<float>::origin();
+        }
+
     private:
         GLFWwindow* m_window;
+
+        constinit static inline auto s_scroll_offset =
+            eqx::lib::Point<float>::origin();
     };
 
     class Frame_Timer
